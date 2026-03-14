@@ -1,0 +1,123 @@
+"""
+将 molecule.csv 按照 8:1:1 的比例划分为训练集、测试集和验证集
+"""
+
+import pandas as pd
+import sys
+from pathlib import Path
+from sklearn.model_selection import train_test_split
+
+def split_dataset_8_1_1(input_csv_path, output_dir=None, random_state=42):
+    """
+    将数据集按照 8:1:1 的比例划分为训练集、测试集和验证集
+    
+    Parameters:
+    -----------
+    input_csv_path : str or Path
+        输入CSV文件路径
+    output_dir : str or Path, optional
+        输出目录，如果为None则使用输入文件所在目录
+    random_state : int
+        随机种子，保证可复现性
+    """
+    # 读取数据
+    print(f"正在读取数据: {input_csv_path}", flush=True)
+    df = pd.read_csv(input_csv_path)
+    print(f"总数据量: {len(df)} 行", flush=True)
+    
+    # 确定输出目录
+    if output_dir is None:
+        output_dir = Path(input_csv_path).parent
+    else:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 第一步：先分出训练集（80%）和临时集（20%）
+    train_df, temp_df = train_test_split(
+        df,
+        test_size=0.2,  # 20%用于测试集和验证集
+        train_size=0.8,  # 80%用于训练集
+        random_state=random_state,
+        shuffle=True
+    )
+    
+    # 第二步：将临时集（20%）再分为测试集（10%）和验证集（10%）
+    # 注意：temp_df 是 20%，我们需要将其分为 50%:50%，这样就是整体的 10%:10%
+    test_df, valid_df = train_test_split(
+        temp_df,
+        test_size=0.5,  # 从20%中分出50%，即整体的10%
+        train_size=0.5,  # 从20%中分出50%，即整体的10%
+        random_state=random_state,
+        shuffle=True
+    )
+    
+    # 保存结果
+    train_path = output_dir / 'molecule_train.csv'
+    test_path = output_dir / 'molecule_test.csv'
+    valid_path = output_dir / 'molecule_valid.csv'
+    
+    train_df.to_csv(train_path, index=False)
+    test_df.to_csv(test_path, index=False)
+    valid_df.to_csv(valid_path, index=False)
+    
+    # 打印统计信息
+    total = len(df)
+    print(f"\n{'='*60}", flush=True)
+    print(f"数据划分完成！", flush=True)
+    print(f"{'='*60}", flush=True)
+    print(f"总数据量: {total} 行", flush=True)
+    print(f"\n训练集: {len(train_df)} 行 ({len(train_df)/total*100:.2f}%)", flush=True)
+    print(f"  保存至: {train_path}", flush=True)
+    print(f"\n测试集: {len(test_df)} 行 ({len(test_df)/total*100:.2f}%)", flush=True)
+    print(f"  保存至: {test_path}", flush=True)
+    print(f"\n验证集: {len(valid_df)} 行 ({len(valid_df)/total*100:.2f}%)", flush=True)
+    print(f"  保存至: {valid_path}", flush=True)
+    print(f"{'='*60}", flush=True)
+    
+    # 验证比例
+    train_ratio = len(train_df) / total
+    test_ratio = len(test_df) / total
+    valid_ratio = len(valid_df) / total
+    
+    print(f"\n实际比例:", flush=True)
+    print(f"  训练集: {train_ratio:.4f} (目标: 0.8000)", flush=True)
+    print(f"  测试集: {test_ratio:.4f} (目标: 0.1000)", flush=True)
+    print(f"  验证集: {valid_ratio:.4f} (目标: 0.1000)", flush=True)
+    print(f"  总和: {train_ratio + test_ratio + valid_ratio:.4f} (应为 1.0000)", flush=True)
+    
+    return train_df, test_df, valid_df
+
+if __name__ == '__main__':
+    # 获取项目根目录（假设脚本在 scr/data/ 下）
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent.parent
+    
+    # 设置路径（相对于项目根目录）
+    input_csv = project_root / 'data/processed/new_dataset/train_dataset/v2/molecule/molecule.csv'
+    
+    print(f"脚本目录: {script_dir}", flush=True)
+    print(f"项目根目录: {project_root}", flush=True)
+    print(f"输入文件路径: {input_csv}", flush=True)
+    print(f"文件绝对路径: {input_csv.resolve()}", flush=True)
+    
+    # 检查文件是否存在
+    if not input_csv.exists():
+        print(f"\n错误: 文件不存在: {input_csv}", flush=True)
+        print(f"绝对路径: {input_csv.resolve()}", flush=True)
+        print(f"请检查路径是否正确", flush=True)
+        sys.exit(1)
+    
+    print(f"\n✓ 文件存在，开始处理...", flush=True)
+    
+    # 执行划分
+    try:
+        train_df, test_df, valid_df = split_dataset_8_1_1(
+            input_csv,
+            random_state=42
+        )
+        print("\n✓ 数据划分完成！", flush=True)
+    except Exception as e:
+        print(f"\n错误: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
